@@ -47,25 +47,28 @@ getWorkstationNameRaw = do
   settings <- ask
   pure (unWorkstationName settings.workstation)
 
+-- | Shell prelude that loads Nix (and the user/home-manager profiles)
+nixProfileSource :: Text
+nixProfileSource = ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh >/dev/null 2>&1; "
+
 instance Prop HomeManagerP where
   desc _ = "home-manager configuration"
   attrs p = Map.fromList [("dir", p.dir)]
 
   checker p = do
-    -- Detect executable through a login shell
-    -- (in case previous command modified login shell, e.g. PATH)
-    hmInstalled <- isRight <$> cmd (exe "bash" "-lc" "command -v home-manager" |> captureTrim)
+    hmInstalled <- isRight <$> cmd (exe "bash" "-c" (T.unpack (nixProfileSource <> "command -v home-manager")) |> captureTrim)
     if not hmInstalled
       then return False
       else do
         ws <- getWorkstationNameRaw
         flakeOut <- liftIO $ mkFlakeOut ws
         expandedDir <- expandPath p.dir
-        let buildCmd = "cd " <> expandedDir
+        let buildCmd = nixProfileSource
+                    <> "cd " <> expandedDir
                     <> " && nix build --json --dry-run -v -L "
                     <> flakeOut
                     <> " --show-trace"
-        result <- cmd (exe "bash" "-lc" (T.unpack buildCmd) |> captureTrim)
+        result <- cmd (exe "bash" "-c" (T.unpack buildCmd) |> captureTrim)
         case result of
           Left _ -> return False
           Right jsonBytes ->
@@ -80,11 +83,12 @@ instance Prop HomeManagerP where
     ws <- getWorkstationNameRaw
     flakeOut <- liftIO $ mkFlakeOut ws
     expandedDir <- expandPath p.dir
-    let runCmd' = "cd " <> expandedDir
+    -- Source the Nix profile so nix is on PATH.
+    let runCmd' = nixProfileSource
+              <> "cd " <> expandedDir
               <> " && nix -v -L --show-trace run "
               <> flakeOut
-    -- Login shell to pick up env changes
-    result <- runCmd ["bash", "-lc", runCmd'] id
+    result <- runCmd ["bash", "-c", runCmd'] id
     either
       (\err-> throwError $ WSFailure $ "Home Manager activation failed: " <> tshow err)
       (const $ putStrLn' "Home Manager configuration activated.")
