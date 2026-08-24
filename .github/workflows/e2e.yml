@@ -55,14 +55,19 @@ jobs:
       - name: Generate hermetic GitHomeDir source repo + fixtures
         run: bash test/ci/setup-src-repo.sh
 
+      # pipefail - ensure fun failure fails step
       - name: Bootstrap (first run)
-        run: ./fun --config test/ci/config.yml --workstation ${{ matrix.ws }} --verbose bootstrap 2>&1 | tee run1.log
+        run: |
+          set -o pipefail
+          ./fun --config test/ci/config.yml --workstation ${{ matrix.ws }} --verbose bootstrap 2>&1 | tee run1.log
 
       - name: Verify system state
         run: bash test/ci/verify.sh
 
       - name: Bootstrap (second run, idempotency)
-        run: ./fun --config test/ci/config.yml --workstation ${{ matrix.ws }} --verbose bootstrap 2>&1 | tee run2.log
+        run: |
+          set -o pipefail
+          ./fun --config test/ci/config.yml --workstation ${{ matrix.ws }} --verbose bootstrap 2>&1 | tee run2.log
 
       - name: Assert idempotency (no fixes applied on second run)
         run: |
