@@ -42,7 +42,10 @@ instance Prop NixDaemonP where
       -- always considered fulfilled.
       NixOS -> return True
       _ -> do
-        nixInstalled <- hasCmd' "nix"
+        -- Detect Nix even when it isn't on `fun`'s own PATH
+        nixOnPath <- hasCmd' "nix"
+        nixAtProfile <- fileExists "/nix/var/nix/profiles/default/bin/nix"
+        let nixInstalled = nixOnPath || nixAtProfile
         if not nixInstalled
           then return False
           else case p.nixConf of

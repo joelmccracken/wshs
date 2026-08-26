@@ -14,6 +14,7 @@ import Shh (exe, captureTrim, (|>))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Aeson (eitherDecode, FromJSON)
+import Data.Either (isRight)
 import Control.Monad.Reader (MonadReader, ask)
 import Control.Monad.Except (MonadError)
 import Control.Monad.IO.Class (liftIO)
@@ -46,19 +47,24 @@ getWorkstationNameRaw = do
   settings <- ask
   pure (unWorkstationName settings.workstation)
 
+-- | Shell prelude that loads Nix (and the user/home-manager profiles)
+nixProfileSource :: Text
+nixProfileSource = ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh >/dev/null 2>&1; "
+
 instance Prop HomeManagerP where
   desc _ = "home-manager configuration"
   attrs p = Map.fromList [("dir", p.dir)]
 
   checker p = do
-    hmInstalled <- hasCmd' "home-manager"
+    hmInstalled <- isRight <$> cmd (exe "bash" "-c" (T.unpack (nixProfileSource <> "command -v home-manager")) |> captureTrim)
     if not hmInstalled
       then return False
       else do
         ws <- getWorkstationNameRaw
         flakeOut <- liftIO $ mkFlakeOut ws
         expandedDir <- expandPath p.dir
-        let buildCmd = "cd " <> expandedDir
+        let buildCmd = nixProfileSource
+                    <> "cd " <> expandedDir
                     <> " && nix build --json --dry-run -v -L "
                     <> flakeOut
                     <> " --show-trace"
@@ -77,7 +83,9 @@ instance Prop HomeManagerP where
     ws <- getWorkstationNameRaw
     flakeOut <- liftIO $ mkFlakeOut ws
     expandedDir <- expandPath p.dir
-    let runCmd' = "cd " <> expandedDir
+    -- Source the Nix profile so nix is on PATH.
+    let runCmd' = nixProfileSource
+              <> "cd " <> expandedDir
               <> " && nix -v -L --show-trace run "
               <> flakeOut
     result <- runCmd ["bash", "-c", runCmd'] id
