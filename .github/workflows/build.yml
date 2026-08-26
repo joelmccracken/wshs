@@ -1,8 +1,7 @@
 name: Build
 
-# Reusable workflow: build the statically-linked `fun` binary for each target
+# build the statically-linked `fun` binary for each target
 # platform with Nix and upload it as an artifact named `funstation-<triple>`.
-# Called by both release.yml (to publish) and e2e.yml (to run + verify).
 on:
   workflow_call:
 
