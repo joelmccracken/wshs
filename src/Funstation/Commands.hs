@@ -102,10 +102,6 @@ mvToBackupAuto path = do
       pure backupPath
     Left err -> throwError $ WSFailure $ "Failed to backup file: " <> tshow err
 
-{-# DEPRECATED mvToBackupSudo "Use mvToBackupAuto instead" #-}
-mvToBackupSudo :: (MonadIO m, MonadReader Settings m, MonadError WSError m) => Text -> m Text
-mvToBackupSudo = mvToBackupAuto
-
 -- | Check if a file has the desired contents.
 -- Returns True if the file exists and matches, False otherwise.
 fileContentsCheck :: (MonadIO m, MonadReader Settings m, MonadError WSError m) => Text -> Text -> m Bool
