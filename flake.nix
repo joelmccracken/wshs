@@ -6,14 +6,17 @@
 
   # version that still has x86_64-darwin support
   inputs.haskellNixIntel.url = "github:input-output-hk/haskell.nix/aa6638e82fa4a2e3f791e4ccb70b250078c693ec";
-  inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  # important that inputs.nixpkgs still supports intel darwin,
+  # otherwise `nix develop`  breaks
+  inputs.nixpkgs.follows = "haskellNixIntel/nixpkgs-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   outputs = inputs@{ self, nixpkgs, flake-utils, haskellNix, haskellNixIntel }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ] (system:
         let
           intel = system == "x86_64-darwin";
           hn = if intel then haskellNixIntel else haskellNix;
-          nixpkgs' = if intel then haskellNixIntel.inputs.nixpkgs-unstable else nixpkgs;
+          nixpkgs' = if intel then haskellNixIntel.inputs.nixpkgs-unstable
+                     else haskellNix.inputs.nixpkgs-unstable;
           # ghc9102 is available for darwin intel
           # ghc9102 is cached cross compiler for musl on zw3rk
           compiler-nix-name = if intel then "ghc9102" else "ghc9103";
